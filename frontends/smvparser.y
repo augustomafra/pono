@@ -356,7 +356,7 @@ var_list:
           enc.arrayty_[$1] = a->getElementType();
          } else if(a->getType() == SMVnode::IntArray){
           enc.arrayint_[$1] = a->getElementType();
-         } 
+         }
       }else{
           SMVnode *a = new var_node_c($1,$3,SMVnode::BasicT);
           enc.var_list_.push_back(new var_node_c($1,$3,SMVnode::BasicT));
@@ -904,7 +904,7 @@ simple_expr: constant {
               SMVnode::Type bvs_a = a->getType();
               SMVnode::Type bvs_b = b->getType();
               smt::Term res;
-              if ((bvs_a == SMVnode::Integer) || (bvs_b == SMVnode::Integer) 
+              if ((bvs_a == SMVnode::Integer) || (bvs_b == SMVnode::Integer)
                   || (bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
                   res = make_arith_op(enc, smt::Lt, a, b);
               }else{
@@ -1235,9 +1235,9 @@ simple_expr: constant {
                   throw PonoException("Word1 word type is uncompatible");
                 }
                 smt::Sort bv1sort = enc.solver_->make_sort(smt::BV, 1);
-                smt::Term res = enc.solver_->make_term(smt::Ite, 
-                                                       boolean->getTerm(), 
-                                                       enc.solver_->make_term(1, bv1sort), 
+                smt::Term res = enc.solver_->make_term(smt::Ite,
+                                                       boolean->getTerm(),
+                                                       enc.solver_->make_term(1, bv1sort),
                                                        enc.solver_->make_term(0, bv1sort));
                 assert(res); //check res non-null
                 $$ = new SMVnode(res,SMVnode::Unsigned);
@@ -1254,8 +1254,8 @@ simple_expr: constant {
                   throw PonoException("Can't convert non-width 1 bitvector to bool.");
                 }
                 smt::Sort bv1sort = enc.solver_->make_sort(smt::BV, 1);
-                smt::Term res = enc.solver_->make_term(smt::Equal, 
-                                                       a->getTerm(), 
+                smt::Term res = enc.solver_->make_term(smt::Equal,
+                                                       a->getTerm(),
                                                        enc.solver_->make_term(1, bv1sort));
                 $$ = new SMVnode(res,SMVnode::Boolean);
               }else{
@@ -1324,11 +1324,11 @@ simple_expr: constant {
               if(enc.module_flat){
                 SMVnode *word = $3;
                 SMVnode::Type word_type = word->getType();
-                
+
                 if(word_type != SMVnode::Integer && word_type != SMVnode::Signed && word_type != SMVnode::Unsigned){
                   throw PonoException("Resize word type is uncompatible");
                 }
-                
+
                 int integer = stoi($5);
                 smt::Sort word_sort = word->getTerm()->get_sort();
                 uint64_t word_width = word_type != SMVnode::Integer ? word_sort->get_width() : 0;
@@ -1336,7 +1336,7 @@ simple_expr: constant {
                 if (word_type == SMVnode::Integer){
                   smt::Term res = enc.solver_->make_term(smt::Op(smt::Int_To_BV, integer), word->getTerm());
                   assert(res);
-                  $$ = new SMVnode(res, SMVnode::Signed);                  
+                  $$ = new SMVnode(res, SMVnode::Signed);
                 }else if(integer == word_width){
                   $$ = word;
                 }else if(integer < word_width){
@@ -1365,7 +1365,7 @@ simple_expr: constant {
               if(enc.module_flat){
                 SMVnode *expr = $4;
                 SMVnode::Type expr_type = expr->getType();
-                
+
                 if(expr_type != SMVnode::Integer){
                   throw PonoException("Signed word conversion type is uncompatible");
                 }
@@ -1751,7 +1751,7 @@ smt::Term make_arith_op(pono::SMVEncoder &enc,
   };
 
   using namespace pono;
-  
+
   assert(fp_op.count(op) > 0);
   assert(a && b);
   SMVnode::Type a_type = a->getType();
@@ -1769,7 +1769,7 @@ smt::Term make_arith_op(pono::SMVEncoder &enc,
     }
     if (b_type == SMVnode::Integer) {
       b_term = enc.solver_->make_term(smt::To_Real, b_term);
-    }    
+    }
     if (need_fp_semantics) {
       auto toFPOp = smt::Op(smt::Real_To_FP,
                             smt::FPSizes<smt::FLOAT64>::exp,
@@ -1786,7 +1786,7 @@ smt::Term make_arith_op(pono::SMVEncoder &enc,
 
   if (need_fp_semantics) {
     op = fp_op[op];
-    if (op == smt::FPAdd || op == smt::FPSub || op == smt::FPMul 
+    if (op == smt::FPAdd || op == smt::FPSub || op == smt::FPMul
         || op == smt::FPDiv || op == smt::FPRem) {
       auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
       return enc.solver_->make_term(op, rm, a_term, b_term);
