@@ -509,7 +509,8 @@ constant: boolean_constant {
 }
           | real_constant{
             if(enc.module_flat){
-            smt::Sort sort_ = enc.solver_->make_sort(smt::FLOAT64);
+            smt::Sort sort_ = enc.fp_semantics_ ? enc.solver_->make_sort(smt::FLOAT64)
+                                                : enc.solver_->make_sort(smt::REAL);
             smt::Term con = enc.solver_->make_term($1,sort_);
             $$ = new SMVnode(con,SMVnode::Real);
             }else{
@@ -642,7 +643,7 @@ simple_expr: constant {
                 assert(tok);
                 if (kind_ == smt::BV || kind_ == smt::BOOL) $$ = new SMVnode(tok,SMVnode::Boolean);
                 else if (kind_ == smt::INT) $$ = new SMVnode(tok,SMVnode::Integer);
-                else if (kind_ == smt::FLOAT64) $$ = new SMVnode(tok,SMVnode::Real);
+                else if (kind_ == smt::REAL || kind_ == smt::FLOAT64) $$ = new SMVnode(tok,SMVnode::Real);
                 else throw PonoException("The type of the identifier is wrong");
               }
             }else{
@@ -902,7 +903,8 @@ simple_expr: constant {
               if ( (bvs_a == SMVnode::Integer) ||(bvs_b == SMVnode::Integer)){
                   res = enc.solver_->make_term(smt::Lt, a->getTerm(), b->getTerm());
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real) ){
-                  res = enc.solver_->make_term(smt::FPLt, a->getTerm(), b->getTerm());              
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPLt, a->getTerm(), b->getTerm()) 
+                                          : enc.solver_->make_term(smt::Lt, a->getTerm(), b->getTerm());              
               }else{
                   if (bvs_a == bvs_b == SMVnode::Unsigned){
                     res = enc.solver_->make_term(smt::BVUlt, a->getTerm(), b->getTerm());
@@ -927,8 +929,10 @@ simple_expr: constant {
               smt::Term res;
               if ( (kind_a == smt::INT) ||(kind_b == smt::INT) ){
                   res = enc.solver_->make_term(smt::Gt, a->getTerm(), b->getTerm());
-              }else if ( (kind_a == smt::FLOAT64) || (kind_b == smt::FLOAT64) ){
-                  res = enc.solver_->make_term(smt::FPGt, a->getTerm(), b->getTerm());
+              }else if ( (kind_a == smt::FLOAT64) || (kind_b == smt::FLOAT64) 
+                         || (kind_a == smt::REAL) || (kind_b == smt::REAL) ){
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPGt, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Gt, a->getTerm(), b->getTerm());
               }else{
                   SMVnode::Type bvs_a = a->getType();
                   SMVnode::Type bvs_b = b->getType();
@@ -956,7 +960,8 @@ simple_expr: constant {
               if ( (bvs_a == SMVnode::Integer) ||(bvs_b == SMVnode::Integer)){
                   res = enc.solver_->make_term(smt::Le, a->getTerm(), b->getTerm());
               }else if ( (bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real) ){
-                  res = enc.solver_->make_term(smt::FPLeq, a->getTerm(), b->getTerm());              
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPLeq, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Le, a->getTerm(), b->getTerm());              
               }else{
                   if (bvs_a == bvs_b == SMVnode::Unsigned){
                     res = enc.solver_->make_term(smt::BVUle, a->getTerm(), b->getTerm());
@@ -982,7 +987,8 @@ simple_expr: constant {
               if ( (bvs_a == SMVnode::Integer) ||(bvs_b == SMVnode::Integer) ){
                   res = enc.solver_->make_term(smt::Ge, a->getTerm(), b->getTerm());
               }else if ( (bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real) ){
-                  res = enc.solver_->make_term(smt::FPGeq, a->getTerm(), b->getTerm());                  
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPGeq, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Ge, a->getTerm(), b->getTerm());                  
               }else{
                   if (bvs_a == bvs_b == SMVnode::Unsigned){
                     res = enc.solver_->make_term(smt::BVUge, a->getTerm(), b->getTerm());
@@ -1003,16 +1009,15 @@ simple_expr: constant {
                 SMVnode *a = $2;
                 SMVnode::Type bvs_a = a->getType();
                 smt::Term res;
-                if ((bvs_a == SMVnode::Integer)){
+                if ((bvs_a == SMVnode::Integer) || (!enc.fp_semantics_ && bvs_a == SMVnode::Real)){
                   res = enc.solver_->make_term(smt::Negate, a->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
+                  if(res->get_sort()->get_sort_kind()==smt::REAL) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
-                }else if ((bvs_a == SMVnode::Real)){
+                }else if (enc.fp_semantics_ && (bvs_a == SMVnode::Real)){
                   res = enc.solver_->make_term(smt::FPNeg, a->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
-                  else $$ = new SMVnode(res,SMVnode::Integer);                
+                  $$ = new SMVnode(res,SMVnode::Real);
                 }else {
                   res = enc.solver_->make_term(smt::BVNeg, a->getTerm());
                   assert(res); //check res non-null
@@ -1035,10 +1040,10 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.solver_->make_term(smt::FPAdd, a->getTerm(), b->getTerm());
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPAdd, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Plus, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
-                  else $$ = new SMVnode(res,SMVnode::Integer);                 
+                  $$ = new SMVnode(res,SMVnode::Real);
               }else{
                   if(bvs_a != bvs_b){
                    throw PonoException(to_string(enc.loc.end.line) +"Unsigned/Signed bitvector mismatch");
@@ -1065,10 +1070,10 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.solver_->make_term(smt::FPSub, a->getTerm(), b->getTerm());
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPSub, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Minus, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
-                  else $$ = new SMVnode(res,SMVnode::Integer);                
+                  $$ = new SMVnode(res,SMVnode::Real); 
               }else{
                   if(bvs_a != bvs_b){
                    throw PonoException(to_string(enc.loc.end.line) +"Unsigned/Signed bitvector mismatch");
@@ -1095,10 +1100,10 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.solver_->make_term(smt::FPMul, a->getTerm(), b->getTerm());
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPMul, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Mult, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
-                  else $$ = new SMVnode(res,SMVnode::Integer);               
+                  $$ = new SMVnode(res,SMVnode::Real);
               }else{
                   if(bvs_a != bvs_b){
                    throw PonoException(to_string(enc.loc.end.line) +"Unsigned/Signed bitvector mismatch");
@@ -1125,10 +1130,10 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.solver_->make_term(smt::FPDiv, a->getTerm(), b->getTerm());
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPDiv, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Div, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
-                  else $$ = new SMVnode(res,SMVnode::Integer);               
+                  $$ = new SMVnode(res,SMVnode::Real);
               }else{
                   if (bvs_a == bvs_b == SMVnode::Unsigned){
                     res = enc.solver_->make_term(smt::BVUdiv, a->getTerm(), b->getTerm());
@@ -1158,10 +1163,10 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ( (bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real) ){
-                  res = enc.solver_->make_term(smt::FPRem, a->getTerm(), b->getTerm());
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPRem, a->getTerm(), b->getTerm())
+                                          : enc.solver_->make_term(smt::Mod, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
-                  if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
-                  else $$ = new SMVnode(res,SMVnode::Integer);                  
+                  $$ = new SMVnode(res,SMVnode::Real);
               }else{
                   if (bvs_a == bvs_b == SMVnode::Unsigned){
                     res = enc.solver_->make_term(smt::BVUrem, a->getTerm(), b->getTerm());
@@ -1325,7 +1330,7 @@ simple_expr: constant {
               {
                 smt::Term t = $3->getTerm();
                 smt::SortKind sk = t->get_sort()->get_sort_kind();
-                assert(sk == smt::FLOAT64 || sk == smt::INT);
+                assert(sk == smt::REAL || sk == smt::FLOAT64 || sk == smt::INT);
                 smt::Term res = enc.solver_->make_term(smt::To_Int, t);
                 $$ = new SMVnode(res, SMVnode::Integer);
               }
@@ -1605,7 +1610,8 @@ complex_identifier: tok_name{
 
 type_identifier: real_type{
         if(enc.module_flat){
-                smt::Sort sort_ = enc.solver_->make_sort(smt::FLOAT64);
+                smt::Sort sort_ = enc.fp_semantics_ ? enc.solver_->make_sort(smt::FLOAT64)
+                                                    : enc.solver_->make_sort(smt::REAL);
                 $$ =  new type_node(sort_,SMVnode::Real);
         }else{
           $$ = new type_node("real");
