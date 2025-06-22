@@ -1040,7 +1040,8 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPAdd, a->getTerm(), b->getTerm())
+                  auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPAdd, rm, a->getTerm(), b->getTerm())
                                           : enc.solver_->make_term(smt::Plus, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
                   $$ = new SMVnode(res,SMVnode::Real);
@@ -1070,7 +1071,8 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPSub, a->getTerm(), b->getTerm())
+                  auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPSub, rm, a->getTerm(), b->getTerm())
                                           : enc.solver_->make_term(smt::Minus, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
                   $$ = new SMVnode(res,SMVnode::Real); 
@@ -1100,7 +1102,8 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPMul, a->getTerm(), b->getTerm())
+                  auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPMul, rm, a->getTerm(), b->getTerm())
                                           : enc.solver_->make_term(smt::Mult, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
                   $$ = new SMVnode(res,SMVnode::Real);
@@ -1130,7 +1133,8 @@ simple_expr: constant {
                   if(res->get_sort()->get_sort_kind()==smt::FLOAT64) $$ = new SMVnode(res,SMVnode::Real);
                   else $$ = new SMVnode(res,SMVnode::Integer);
               }else if ((bvs_a == SMVnode::Real) || (bvs_b == SMVnode::Real)){
-                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPDiv, a->getTerm(), b->getTerm())
+                  auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                  res = enc.fp_semantics_ ? enc.solver_->make_term(smt::FPDiv, rm, a->getTerm(), b->getTerm())
                                           : enc.solver_->make_term(smt::Div, a->getTerm(), b->getTerm());
                   assert(res); //check res non-null
                   $$ = new SMVnode(res,SMVnode::Real);
