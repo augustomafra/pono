@@ -62,12 +62,8 @@ enum optionIndex
   SMT_INTERPOLATOR_OPT,
   LOGGING_SMT_SOLVER,
   PRINTING_SMT_SOLVER,
-<<<<<<< HEAD
   PRINTING_SMT_INTERPOLATOR,
   SMV_FP_SEMANTICS,
-=======
-  SMV_FP_SEMANTICS,
->>>>>>> b7b1050 (Add an option "--smv-fp-semantics" to Encode SMV real types with Floating-Point 64-bit precision semantics)
   NO_IC3_PREGEN,
   NO_IC3_INDGEN,
   IC3_GEN_MAX_ITER,
