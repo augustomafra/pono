@@ -367,7 +367,8 @@ const option::Descriptor usage[] = {
     "",
     "smv-fp-semantics",
     Arg::None,
-    "  --smv-fp-semantics \tEncode SMV real types with Floating-Point 64-bit precision semantics." },
+    "  --smv-fp-semantics \tEncode SMV real types with Floating-Point 64-bit "
+    "precision semantics." },
   { NO_IC3_PREGEN,
     0,
     "",
