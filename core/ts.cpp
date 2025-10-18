@@ -112,7 +112,18 @@ TransitionSystem::TransitionSystem(const TransitionSystem & other_ts,
   for (const auto & elem : other_ts.state_updates_) {
     key = transfer(elem.first);
     val = transfer_as(elem.second, key->get_sort()->get_sort_kind());
-    assert(key->get_sort() == val->get_sort());
+    bool equal_sorts = key->get_sort() == val->get_sort();
+    if (solver_->get_solver_enum() == smt::MSAT
+        || solver_->get_solver_enum() == smt::MSAT_INTERPOLATOR) {
+      // MathSAT does not convert Int to Real, so consider them matching sorts
+      if ((key->get_sort()->get_sort_kind() == INT
+           && val->get_sort()->get_sort_kind() == REAL)
+          || (key->get_sort()->get_sort_kind() == REAL
+              && val->get_sort()->get_sort_kind() == INT)) {
+        equal_sorts = true;
+      }
+    }
+    assert(equal_sorts);
     state_updates_[key] = val;
   }
   for (const auto & elem : other_ts.next_map_) {
