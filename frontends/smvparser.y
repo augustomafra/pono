@@ -856,15 +856,45 @@ simple_expr: constant {
               SMVnode::Type bvs_a = a->getType();
               SMVnode::Type bvs_b = b->getType();
               smt::Term e;
-              if((bvs_a == SMVnode::Real && bvs_b == SMVnode::Integer) || (bvs_a == SMVnode::Integer && bvs_b == SMVnode::Real) ){
+              if((bvs_a == SMVnode::Real || bvs_b == SMVnode::Real) && bvs_a != bvs_b) {
+                SMVnode::Type to_convert = bvs_a == SMVnode::Real ? bvs_b : bvs_a;
+
+                smt::Op conversion_op;
+                if (to_convert == SMVnode::Integer){
+                  assert(!enc.fp_semantics_);
+                  conversion_op = smt::Op(smt::To_Real);
+                }else if (to_convert == SMVnode::Unsigned){
+                  assert(enc.fp_semantics_);
+                  conversion_op = smt::Op(smt::UBV_To_FP,
+                                          smt::FPSizes<smt::FLOAT64>::exp,
+                                          smt::FPSizes<smt::FLOAT64>::sig);
+                }else if (to_convert == SMVnode::Signed){
+                  assert(enc.fp_semantics_);
+                  conversion_op = smt::Op(smt::SBV_To_FP,
+                                          smt::FPSizes<smt::FLOAT64>::exp,
+                                          smt::FPSizes<smt::FLOAT64>::sig);
+                }
+
                 smt::Term a_term = a->getTerm();
                 smt::Term b_term = b->getTerm();
-                if (bvs_a == SMVnode::Real || bvs_b == SMVnode::Real){
-                  if (bvs_a != SMVnode::Real)
-                    a_term = enc.solver_->make_term(smt::To_Real, a_term);
-                  if (bvs_b != SMVnode::Real)
-                    b_term = enc.solver_->make_term(smt::To_Real, b_term);
+
+                if (bvs_a != SMVnode::Real){
+                  if (conversion_op.prim_op == smt::To_Real){
+                    a_term = enc.solver_->make_term(conversion_op, a_term);
+                  }else{
+                    auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                    a_term = enc.solver_->make_term(conversion_op, rm, a_term);
+                  }
                 }
+                if (bvs_b != SMVnode::Real){
+                  if (conversion_op.prim_op == smt::To_Real){
+                    b_term = enc.solver_->make_term(conversion_op, b_term);
+                  }else{
+                    auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                    b_term = enc.solver_->make_term(conversion_op, rm, b_term);
+                  }
+                }
+
                 e = enc.solver_->make_term(smt::Equal, a_term, b_term);
               }else if(bvs_a != bvs_b){
                  throw PonoException(to_string(enc.loc.end.line) +" Unsigned/Signed mismatch");
@@ -1269,8 +1299,15 @@ simple_expr: constant {
                 if(sort->get_sort_kind() != smt::BV){
                   throw PonoException("Can't convert non-bitvector to integer.");
                 }
-                smt::Term res = enc.solver_->make_term(smt::BV_To_Nat, a->getTerm());
-                $$ = new SMVnode(res,SMVnode::Integer);
+                // Some Floating-Point SMT solvers do not support Real/Integer
+                // arithmetic. Defer conversion from BV to FP until any
+                // FP arithmetic term is found.
+                smt::Term res = enc.fp_semantics_
+                                    ? a->getTerm()
+                                    : a->getType() == SMVnode::Signed
+                                        ? enc.solver_->make_term(smt::SBV_To_Int, a->getTerm())
+                                        : enc.solver_->make_term(smt::UBV_To_Int, a->getTerm());
+                $$ = new SMVnode(res, enc.fp_semantics_ ? a->getType() : SMVnode::Integer);
               }else{
                 $$ = new toint_expr($3);
               }
@@ -1306,11 +1343,19 @@ simple_expr: constant {
               {
                 smt::Term t = $3->getTerm();
                 smt::SortKind sk = t->get_sort()->get_sort_kind();
-                assert(sk == smt::REAL || sk == smt::FLOAT64 || sk == smt::INT);
-                if (sk == smt::FLOAT64)
-                  t = enc.solver_->make_term(smt::FP_To_REAL, t);
-                smt::Term res = enc.solver_->make_term(smt::To_Int, t);
-                $$ = new SMVnode(res, SMVnode::Integer);
+                if (!enc.fp_semantics_){
+                  assert(sk == smt::REAL || sk == smt::INT);
+                  smt::Term res = enc.solver_->make_term(smt::To_Int, t);
+                  $$ = new SMVnode(res, SMVnode::Integer);
+                }else{
+                  assert(sk == smt::FLOAT64);
+                  auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
+                  smt::Term res = enc.solver_->make_term(smt::Op(smt::FP_To_SBV,
+                                                                 smt::FPSizes<smt::FLOAT64>::size),
+                                                         rm,
+                                                         t);
+                  $$ = new SMVnode(res, SMVnode::Signed);
+                }
               }
               else
               {
@@ -1756,29 +1801,31 @@ smt::Term make_arith_op(pono::SMVEncoder &enc,
   assert(a && b);
   SMVnode::Type a_type = a->getType();
   SMVnode::Type b_type = b->getType();
-  assert(a_type == SMVnode::Integer || a_type == SMVnode::Real);
-  assert(b_type == SMVnode::Integer || b_type == SMVnode::Real);
+  assert(a_type == SMVnode::Signed || a_type == SMVnode::Unsigned || a_type == SMVnode::Integer || a_type == SMVnode::Real);
+  assert(b_type == SMVnode::Signed || b_type == SMVnode::Unsigned || b_type == SMVnode::Integer || b_type == SMVnode::Real);
   smt::Term a_term = a->getTerm();
   smt::Term b_term = b->getTerm();
 
   bool need_fp_semantics = enc.fp_semantics_ && (a_type == SMVnode::Real || b_type == SMVnode::Real);
   if (a_type != b_type) {
-    // Type mismatch between a and b: convert the Integer one to Real or FP
-    if (a_type == SMVnode::Integer) {
-      a_term = enc.solver_->make_term(smt::To_Real, a_term);
-    }
-    if (b_type == SMVnode::Integer) {
-      b_term = enc.solver_->make_term(smt::To_Real, b_term);
-    }
-    if (need_fp_semantics) {
-      auto toFPOp = smt::Op(smt::Real_To_FP,
+    // Type mismatch between a and b: convert the Integer/BV one to Real or FP
+    if (!enc.fp_semantics_) {
+      if (a_type == SMVnode::Integer) {
+        a_term = enc.solver_->make_term(smt::To_Real, a_term);
+      }
+      if (b_type == SMVnode::Integer) {
+        b_term = enc.solver_->make_term(smt::To_Real, b_term);
+      }
+    } else if (need_fp_semantics) {
+      SMVnode::Type to_convert = a_type == SMVnode::Real ? b_type : a_type;
+      auto toFPOp = smt::Op(to_convert == SMVnode::Unsigned ? smt::UBV_To_FP : smt::SBV_To_FP,
                             smt::FPSizes<smt::FLOAT64>::exp,
                             smt::FPSizes<smt::FLOAT64>::sig);
       auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
-      if (a_type == SMVnode::Integer) {
+      if (a_type != SMVnode::Real) {
         a_term = enc.solver_->make_term(toFPOp, rm, a_term);
       }
-      if (b_type == SMVnode::Integer) {
+      if (b_type != SMVnode::Real) {
         b_term = enc.solver_->make_term(toFPOp, rm, b_term);
       }
     }
