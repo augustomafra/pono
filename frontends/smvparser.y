@@ -868,13 +868,13 @@ simple_expr: constant {
                 }else if (to_convert == SMVnode::Unsigned){
                   assert(enc.fp_semantics_);
                   conversion_op = smt::Op(smt::UBV_To_FP,
-                                          smt::FPSizes<smt::FLOAT64>::exp,
-                                          smt::FPSizes<smt::FLOAT64>::sig);
+                                          smt::FPSizes<64>::exp,
+                                          smt::FPSizes<64>::sig);
                 }else if (to_convert == SMVnode::Signed){
                   assert(enc.fp_semantics_);
                   conversion_op = smt::Op(smt::SBV_To_FP,
-                                          smt::FPSizes<smt::FLOAT64>::exp,
-                                          smt::FPSizes<smt::FLOAT64>::sig);
+                                          smt::FPSizes<64>::exp,
+                                          smt::FPSizes<64>::sig);
                 }
 
                 smt::Term a_term = a->getTerm();
