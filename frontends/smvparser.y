@@ -1433,7 +1433,13 @@ simple_expr: constant {
                 $$ = new SMVnode(res, SMVnode::Signed);
               }else{
                 SMVnode *integer = new constant(std::to_string($2));
-                $$ = new signed_word(integer,$4);
+                // Some Floating-Point SMT solvers do not support the Integer
+                // sort, so encode integer conversions using BV-resize in FP mode:
+                if (enc.fp_semantics_){
+                  $$ = new resize_expr($4, integer);
+                }else{
+                  $$ = new signed_word(integer,$4);
+                }
               }
             }
             | unsigned_word sizev "(" basic_expr ")"{
