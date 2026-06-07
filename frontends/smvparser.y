@@ -513,7 +513,9 @@ constant: boolean_constant {
 }
           | real_constant{
             if(enc.module_flat){
-            smt::Sort sort_ = enc.fp_semantics_ ? enc.solver_->make_sort(smt::FLOAT64)
+            smt::Sort sort_ = enc.fp_semantics_ ? enc.solver_->make_sort(smt::FLOAT,
+                                                                         smt::FPSizes<64>::exp,
+                                                                         smt::FPSizes<64>::sig)
                                                 : enc.solver_->make_sort(smt::REAL);
             smt::Term con = enc.solver_->make_term($1,sort_);
             $$ = new SMVnode(con,SMVnode::Real);
@@ -647,7 +649,7 @@ simple_expr: constant {
                 assert(tok);
                 if (kind_ == smt::BV || kind_ == smt::BOOL) $$ = new SMVnode(tok,SMVnode::Boolean);
                 else if (kind_ == smt::INT) $$ = new SMVnode(tok,SMVnode::Integer);
-                else if (kind_ == smt::REAL || kind_ == smt::FLOAT64) $$ = new SMVnode(tok,SMVnode::Real);
+                else if (kind_ == smt::REAL || kind_ == smt::FLOAT) $$ = new SMVnode(tok,SMVnode::Real);
                 else throw PonoException("The type of the identifier is wrong");
               }
             }else{
@@ -930,7 +932,7 @@ simple_expr: constant {
               smt::SortKind kind_b = b->getTerm()->get_sort()->get_sort_kind();
               smt::Term res;
               if ((kind_a == smt::INT) || (kind_b == smt::INT)
-                  || (kind_a == smt::FLOAT64) || (kind_b == smt::FLOAT64)
+                  || (kind_a == smt::FLOAT) || (kind_b == smt::FLOAT)
                   || (kind_a == smt::REAL) || (kind_b == smt::REAL)){
                   res = make_arith_op(enc, smt::Gt, a, b);
               }else{
@@ -1323,8 +1325,8 @@ simple_expr: constant {
               {
                 smt::Term t = $3->getTerm();
                 smt::SortKind sk = t->get_sort()->get_sort_kind();
-                assert(sk == smt::REAL || sk == smt::FLOAT64 || sk == smt::INT);
-                if (sk == smt::FLOAT64)
+                assert(sk == smt::REAL || sk == smt::FLOAT || sk == smt::INT);
+                if (sk == smt::FLOAT)
                   t = enc.solver_->make_term(smt::FP_To_REAL, t);
                 smt::Term res = enc.solver_->make_term(smt::To_Int, t);
                 $$ = new SMVnode(res, SMVnode::Integer);
@@ -1598,7 +1600,9 @@ complex_identifier: tok_name{
 
 type_identifier: real_type{
         if(enc.module_flat){
-                smt::Sort sort_ = enc.fp_semantics_ ? enc.solver_->make_sort(smt::FLOAT64)
+                smt::Sort sort_ = enc.fp_semantics_ ? enc.solver_->make_sort(smt::FLOAT,
+                                                                             smt::FPSizes<64>::exp,
+                                                                             smt::FPSizes<64>::sig)
                                                     : enc.solver_->make_sort(smt::REAL);
                 $$ =  new type_node(sort_,SMVnode::Real);
         }else{
@@ -1782,8 +1786,8 @@ smt::Term make_arith_op(pono::SMVEncoder &enc,
     }    
     if (need_fp_semantics) {
       auto toFPOp = smt::Op(smt::Real_To_FP,
-                            smt::FPSizes<smt::FLOAT64>::exp,
-                            smt::FPSizes<smt::FLOAT64>::sig);
+                            smt::FPSizes<64>::exp,
+                            smt::FPSizes<64>::sig);
       auto rm = enc.solver_->make_term(smt::FPRoundingMode::ROUND_NEAREST_TIES_TO_EVEN);
       if (a_type == SMVnode::Integer) {
         a_term = enc.solver_->make_term(toFPOp, rm, a_term);
