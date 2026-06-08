@@ -1306,8 +1306,15 @@ simple_expr: constant {
                 SMVnode *a = $3;
                 smt::Sort sort = a->getTerm()->get_sort();
                 smt::Term res;
-                if(sort->get_sort_kind() == smt::BV){
-                  res = enc.solver_->make_term(smt::BV_To_Nat, a->getTerm());
+                // Some Floating-Point SMT solvers do not support Real/Integer
+                // arithmetic. Defer conversion from BV to FP until any
+                // FP arithmetic term is found.
+                if(enc.fp_semantics_){
+                  res = a->getTerm();
+                }else if(sort->get_sort_kind() == smt::BV){
+                  res = a->getType() == SMVnode::Signed
+                            ? enc.solver_->make_term(smt::SBV_To_Int, a->getTerm())
+                            : enc.solver_->make_term(smt::UBV_To_Int, a->getTerm());
                 }else if(sort->get_sort_kind() == smt::BOOL){
                   smt::Sort intsort = enc.solver_->make_sort(smt::INT);
                   res = enc.solver_->make_term(smt::Ite,
@@ -1319,14 +1326,6 @@ simple_expr: constant {
                 }else{
                   throw PonoException("toint can only be applied to booleans and bitvectors");
                 }
-                // Some Floating-Point SMT solvers do not support Real/Integer
-                // arithmetic. Defer conversion from BV to FP until any
-                // FP arithmetic term is found.
-                smt::Term res = enc.fp_semantics_
-                                    ? a->getTerm()
-                                    : a->getType() == SMVnode::Signed
-                                        ? enc.solver_->make_term(smt::SBV_To_Int, a->getTerm())
-                                        : enc.solver_->make_term(smt::UBV_To_Int, a->getTerm());
                 $$ = new SMVnode(res, enc.fp_semantics_ ? a->getType() : SMVnode::Integer);
               }else{
                 $$ = new toint_expr($3);
